@@ -60,3 +60,74 @@ class RTree:
             key=lambda child: self._expansion_cost(child.bounding_box, rectangle)
         )
         return self._choose_leaf(best_child, rectangle)
+    
+    def remove(self, rectangle):
+        path = []
+        node, index = self._find_rectangle(self.root, rectangle, path)
+        if node is None or index is None:
+            return False
+        # Remover em definitivo
+        del node.children[index]
+        self._adjust_tree(path)
+        return True
+    
+    def _find_rectangle(self, node, rectangle, path):
+        if node.is_leaf:
+            for i, child in enumerate(node.children):
+                if child.bounding_box == rectangle:
+                    return node, i
+            return None, None
+        path.append(node)
+        for child in node.children:
+            result = self._find_rectangle(child, rectangle, path)
+            if result[0]:
+                return result
+        path.pop()
+        return None, None
+    
+    def _adjust_tree(self, path):
+        for node in reversed(path):
+            node.upfate_bounding_box()
+            if not node.is_leaf and len(node.children) < 2:
+                for child in node.children:
+                    self._reinsert(child)
+                node.children.clear()
+    
+    def _reinsert(self, node):
+        leaf = self._choose_leaf(self.root, node.bounding_box)
+        leaf.children.append(node)
+        leaf.update_bounding_box()
+        if len(leaf.children) > self.max_children:
+            self._split_node(leaf)
+    
+    def _split_node(self, node):
+        node.children.sort(key=lambda child: child.bounding_box.x_min)
+        mid = len(node.children) // 2
+        new_node = RTreeNode(is_leaf=node.is_leaf)
+        new_node.children = node.children[mid:]
+        node.children = node.children[:mid]
+        node.update_bounding_box()
+        new_node.update_bounding_box()
+
+        if node == self.root:
+            new_root = RTreeNode(is_leaf=False)
+            new_root.children = [node, new_node]
+            new_root.update_bounding_box()
+            self.root = new_root
+        else:
+            parent = self._find_parent(self.root, node)
+            parent.children.append(new_node)
+            parent.update_bounding_box()
+            if len(parent.children) > self.max_children:
+                self._split_node(parent)
+
+    def _find_parent(self, node, target):
+        if node.is_leaf:
+            return None
+        for child in node.children:
+            if child == target:
+                return node
+            result = self._find_parent(child, target)
+            if result:
+                return result
+        return None
