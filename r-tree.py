@@ -131,3 +131,27 @@ class RTree:
             if result:
                 return result
         return None
+    
+    
+    
+    def search(self, object):
+        node = self.root
+        rectangles = []
+        def _search_intern(node, object, rectangles):
+
+            if not node.bounding_box.overlaps(object):
+                return  
+            
+            rectangles.append(node.bounding_box)
+            
+            if node.is_leaf:
+                for child in node.children:
+                    if child.bounding_box.overlaps(object):
+                        rectangles.append(child.bounding_box)
+                return
+
+            for child in node.children:
+                _search_intern(child, object, rectangles)
+
+        _search_intern(node, object, rectangles)
+        return rectangles
